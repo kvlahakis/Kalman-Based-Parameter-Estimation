@@ -1,0 +1,28 @@
+# ------------------------------------------------------------
+# Local experiment outputs (Hydra / plots / logs)
+# Keep these files locally; do not track in git.
+# ------------------------------------------------------------
+/runs/
+/multirun/
+**/.hydra/
+
+# Some experiments write their own nested runs/ dirs
+Experiments/**/runs/
+ADEnKF/experiments/**/runs/
+
+# Generated figures and UQ plot outputs (do not commit)
+ADEnKF/experiments/**/figures/
+ADEnKF/experiments/**/uq_results/
+ADEnKF/experiments/**/uq_results_*/
+ADEnKF/experiments/**/*.png
+ADEnKF/experiments/**/*.pdf
+Data/**/figures/
+Data/**/*.png
+Data/**/*.pdf
+
+# ------------------------------------------------------------
+# Python / OS noise
+# ------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.DS_Store

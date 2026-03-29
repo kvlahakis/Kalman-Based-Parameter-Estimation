@@ -1,0 +1,74 @@
+# Randomness
+seed: 42
+
+# Ensemble size
+N_ens: 50
+
+# problem setting
+x_dim: 3
+p_dim: 3
+
+# Observation dimension
+m: 3
+
+# Initial parameter center for ensemble (sigma, rho, beta) — match AD-EnKF init_params for comparable runs
+# If omitted, theta_true from data is used.
+initial_theta: [12.0, 20.0, 5.0]
+
+# initialisation
+state_init:
+  _target_: enkf_ppe.Utils.initialisations.GaussianInit
+  std: 0.5
+  track_grads: false
+param_init:
+  _target_: enkf_ppe.Utils.initialisations.GaussianInit
+  std: 0.01
+  track_grads: false
+
+# Model
+model: 
+  _target_: enkf_ppe.Models.ENKF.StateAugEnKF
+  transition_fn:
+    _target_: enkf_ppe.Dynamics.Lorentz63.forward
+    _partial_: true
+    dt: 0.01
+  obs_fn:
+    _target_: enkf_ppe.Utils.observation_fns.FullObservation
+  process_noise_cov:
+    _target_: enkf_ppe.Utils.covariances.ScaledIdentity
+    dim: ${x_dim}
+    std: 0.5
+    track_grads: false
+  param_noise_cov:
+    _target_: enkf_ppe.Utils.covariances.ScaledIdentity
+    dim: ${p_dim}
+    std: 0.01
+    track_grads: false
+  obs_noise_cov:
+    _target_: enkf_ppe.Utils.covariances.ScaledIdentity
+    dim: ${m}
+    std: 1.0
+    track_grads: false
+  time_step: 0.01
+
+# Data path from the data directory
+data_path: Lorentz63/sigma10.0000_rho28.0000_beta2.6667_dt0.0100.pt
+
+# Sweep
+sweep:
+  # Number of model integration steps between successive observations.
+  # obs_dt = n_forecasts * data.dt
+  n_forecasts: [1, 2, 5, 10, 20, 50]
+
+# Experiment
+experiment:
+  T_use: 6000          # cap on total model steps to use from the dataset
+  spinup_frac: 0.2     # fraction of observation steps discarded as spin-up
+  spinup_min: 10       # minimum spin-up steps regardless of spinup_frac
+
+# Hydra
+hydra:
+  job:
+    chdir: false   # keep cwd at the script's directory
+  run:
+    dir: runs/butterfly/state_aug_enkf1

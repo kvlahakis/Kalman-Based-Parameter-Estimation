@@ -1,0 +1,21 @@
+name: enkf_ppe
+channels:
+  - conda-forge
+  - pytorch
+  - defaults
+dependencies:
+  # Core language
+  - python=3.12
+  - numpy
+  - scipy
+  - matplotlib
+  - pandas
+  - torchaudio
+  - torchvision
+  - plotly
+  - tqdm
+  -  matplotlib>=3.3
+  - pip
+  - pip:
+      - torchdiffeq
+      - hydra-core

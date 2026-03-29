@@ -1,0 +1,19 @@
+# Keep this folder's ignore minimal.
+# Run outputs are ignored at the repo root (.gitignore) so they stay local.
+
+# Python bytecode / caches
+__pycache__/
+*.py[cod]
+
+# Virtualenvs
+.env
+.venv
+env/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE / OS noise
+.idea/
+.DS_Store
