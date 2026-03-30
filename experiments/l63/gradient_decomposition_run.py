@@ -27,12 +27,7 @@ Run from repo root with:
 import sys
 import math
 from pathlib import Path
-
-_script_dir   = Path(__file__).resolve().parent
-_ad_enkf_dir  = _script_dir.parent.parent
-_repo_root    = _ad_enkf_dir.parent
-sys.path.insert(0, str(_repo_root))
-sys.path.insert(0, str(_ad_enkf_dir))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # repo root
 
 import torch
 import numpy as np
@@ -49,7 +44,7 @@ from paths import DATA_DIR
 torch.manual_seed(42)
 np.random.seed(42)
 
-FIG_DIR = _script_dir / "figures"
+FIG_DIR = Path(__file__).resolve().parent / "figures"
 FIG_DIR.mkdir(parents=True, exist_ok=True)
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

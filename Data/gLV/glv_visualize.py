@@ -17,7 +17,7 @@ Fig 2 — Time series panel (well-specified vs most misspecified)
 Fig 3 — Long-run population shift across sweep
     All species (left) and herbivore competition zoom (right).
 
-Fig 4 — Trajectories (noiseless, Producer 1 vs Herbivore 3, Producer 1 vs Herbivore 4)
+Fig 4 — Trajectories (noiseless, Producer 1 vs Herbivore 1, Producer 1 vs Herbivore 2)
     Uses clean noiseless integration of model so the fixed-point attractor is visible.
 
 Usage
@@ -44,16 +44,16 @@ from glv_data_generator import (
 # Shared style constants
 # ---------------------------------------------------------------------------
 
-SPECIES_NAMES  = ['Producer 1', 'Producer 2', 'Herbivore 3',
-                  'Herbivore 4', 'Apex Predator']
-SPECIES_SHORT  = ['P1', 'P2', 'H3', 'H4', 'AP']
+SPECIES_NAMES  = ['Producer 1', 'Producer 2', 'Herbivore 1',
+                  'Herbivore 2', 'Apex Predator']
+SPECIES_SHORT  = ['P1', 'P2', 'H1', 'H2', 'AP']
 
 # Deliberately distinguishable: dark/light split within each trophic group
 SPECIES_COLORS = [
     "#177817",   # Producer 1  — deep forest green
     "#a9c838",   # Producer 2  — light lime green
-    '#1a3a8f',   # Herbivore 3 — deep navy blue
-    "#6ec1fc",   # Herbivore 4 — light sky blue
+    '#1a3a8f',   # Herbivore 1 — deep navy blue
+    "#6ec1fc",   # Herbivore 2 — light sky blue
     '#e74c3c',   # Apex Predator — red
 ]
 
@@ -241,80 +241,87 @@ def fig_food_web(a_hidden_shown=0.15, out_dir='.'):
 # Fig 2 — Time series
 # ---------------------------------------------------------------------------
 
-def fig_time_series(data_dir='./data', out_dir='.'):
+def fig_time_series(data_dir='./data', out_dir='.', a_hidden_compare=None):
     """
-    Side-by-side time series for a_hidden=0.00 and a_hidden=0.20.
-    Top row: all true trajectories (observed solid, unobserved dashed).
-    Bottom row: observed species only, true vs noisy observations.
+    Time series figure.
+
+    If a_hidden_compare is None: single column, well-specified case only.
+    If a_hidden_compare is provided: two columns, well-specified vs misspecified.
+
+    Panel layout depends on observability:
+      - All species observed: 3 rows (Producers / Herbivores / Apex Predator)
+      - Partial obs:          2 rows (Observed / Unobserved)
     """
-    cases = [0.00, 0.20]
-    fig, axes = plt.subplots(2, 2, figsize=(14, 8), sharex=True)
+    cases = [0.00] if a_hidden_compare is None else [0.00, a_hidden_compare]
+    n_cols = len(cases)
+
+    # determine observability from first dataset
+    truth0, obs0 = load(cases[0], data_dir)
+    H0        = obs0['H']
+    obs_idx   = np.where(H0.sum(axis=0) > 0)[0]
+    unobs_idx = np.where(H0.sum(axis=0) == 0)[0]
+    all_obs   = len(unobs_idx) == 0
+
+    if all_obs:
+        n_rows     = 3
+        row_labels = ['Producers', 'Herbivores', 'Apex Predator']
+        row_species = [[0, 1], [2, 3], [4]]
+    else:
+        n_rows     = 2
+        row_labels = ['Observed species', 'Unobserved species']
+        row_species = [list(obs_idx), list(unobs_idx)]
+
+    fig, axes = plt.subplots(n_rows, n_cols,
+                             figsize=(7 * n_cols, 3.5 * n_rows),
+                             sharex=True, sharey='row',
+                             squeeze=False)
 
     for col, a_h in enumerate(cases):
         truth, obs = load(a_h, data_dir)
-        t       = truth['t']
-        X       = truth['X']
-        Y       = obs['Y']
-        H       = obs['H']
-        obs_idx = np.where(H.sum(axis=0) > 0)[0]
+        t = truth['t']
+        X = truth['X']
+        Y = obs['Y']
+        H = obs['H']
+        obs_idx_col = np.where(H.sum(axis=0) > 0)[0]
 
-        title = ('Well-specified  ($a_{\\mathrm{hidden}}=0$)'
-                 if a_h == 0.0 else
-                 f'Misspecified  ($a_{{\\mathrm{{hidden}}}}={a_h:.2f}$)')
+        col_title = ('Well-specified  ($a_{\\mathrm{hidden}}=0$)'
+                     if a_h == 0.0 else
+                     f'Misspecified  ($a_{{\\mathrm{{hidden}}}}={a_h:.2f}$)')
+        axes[0, col].set_title(col_title, fontsize=11)
 
-        # top: all true trajectories
-        ax = axes[0, col]
-        for i in range(5):
-            ls  = '-'   if i in obs_idx else '--'
-            alp = 1.0   if i in obs_idx else 0.55
-            ax.plot(t, X[i], color=SPECIES_COLORS[i], lw=1.8,
-                    ls=ls, alpha=alp, label=SPECIES_NAMES[i])
-        ax.set_title(title, fontsize=11)
-        if col == 0:
-            ax.set_ylabel('True population', fontsize=10)
-        ax.set_ylim(bottom=0)
+        for row, (species_group, row_label) in enumerate(zip(row_species, row_labels)):
+            ax = axes[row, col]
+            for i in species_group:
+                ax.plot(t, X[i], color=SPECIES_COLORS[i], lw=1.8, alpha=0.85,
+                        label=SPECIES_NAMES[i])
+                if i in obs_idx_col:
+                    k = np.where(obs_idx_col == i)[0][0]
+                    ax.scatter(t[::2], Y[k, ::2], color=SPECIES_COLORS[i],
+                               s=8, alpha=0.6, zorder=3)
+            if col == 0:
+                ax.set_ylabel(row_label, fontsize=10)
+            if row == n_rows - 1:
+                ax.set_xlabel('Time', fontsize=10)
+            ax.set_ylim(bottom=0)
 
-        # bottom: observations vs truth for observed species only
-        ax = axes[1, col]
-        for k, i in enumerate(obs_idx):
-            ax.plot(t, X[i], color=SPECIES_COLORS[i], lw=1.8, alpha=0.6)
-            ax.scatter(t[::2], Y[k, ::2], color=SPECIES_COLORS[i],
-                       s=10, alpha=0.85, zorder=3)
-        if col == 0:
-            ax.set_ylabel('Observed population', fontsize=10)
-        ax.set_xlabel('Time', fontsize=10)
-        ax.set_ylim(bottom=0)
-
-        # annotate herb3 suppression on the misspecified column
-        if a_h > 0:
-            x3_mean = X[2, int(0.5 * len(t)):].mean()
-            ax.annotate(
-                'Herb3 suppressed\nby hidden competition',
-                xy=(70, x3_mean + 0.02),
-                xytext=(55, x3_mean + 0.35),
-                fontsize=8.5, color=SPECIES_COLORS[2],
-                arrowprops=dict(arrowstyle='->', color=SPECIES_COLORS[2], lw=1.2)
-            )
-
-    # single shared legend — species colors + line style meaning
     species_handles = [
         Line2D([0], [0], color=SPECIES_COLORS[i], lw=2.2, label=SPECIES_NAMES[i])
         for i in range(5)
     ]
     style_handles = [
-        Line2D([0], [0], color='gray', lw=2,       label='True (observed species)'),
-        Line2D([0], [0], color='gray', lw=2, ls='--', label='True (unobserved species)'),
+        Line2D([0], [0], color='gray', lw=2,             label='True trajectory'),
         Line2D([0], [0], color='gray', lw=0, marker='o', ms=5,
                label='Noisy observation $y_k$'),
     ]
     fig.legend(handles=species_handles + style_handles,
                loc='lower center', ncol=4,
-               fontsize=9, bbox_to_anchor=(0.5, -0.07))
+               fontsize=9, bbox_to_anchor=(0.5, -0.05))
 
     fig.suptitle('Population dynamics: true trajectories and noisy observations',
                  fontsize=13)
-    plt.tight_layout(rect=[0, 0.08, 1, 1])
+    plt.tight_layout(rect=[0, 0.07, 1, 1])
     _save(fig, 'fig2_time_series', out_dir)
+
 
 
 # ---------------------------------------------------------------------------
@@ -395,8 +402,8 @@ def fig_competition_effect(data_dir='./data', out_dir='.'):
 def fig_trajectories(data_dir='./data', out_dir='.'):
     """
     Noiseless projected trajectories: 2 rows x 5 columns.
-    Row 0: Producer 1 vs Herbivore 3  (suppressed by hidden competition)
-    Row 1: Producer 1 vs Herbivore 4  (benefits from hidden competition)
+    Row 0: Producer 1 vs Herbivore 1  (suppressed by hidden competition)
+    Row 1: Producer 1 vs Herbivore 2  (benefits from hidden competition)
     Each column is one sweep value of a_hidden.
     Transient faded; post-transient trajectory in full color.
     """
@@ -409,8 +416,8 @@ def fig_trajectories(data_dir='./data', out_dir='.'):
     fig, axes = plt.subplots(2, n, figsize=(3.5 * n, 8))
 
     row_specs = [
-        (2, 'Herbivore 3'),
-        (3, 'Herbivore 4'),
+        (2, 'Herbivore 1'),
+        (3, 'Herbivore 2'),
     ]
 
     for col, (a_h, sweep_color) in enumerate(zip(A_HIDDEN_SWEEP, SWEEP_COLORS)):
@@ -458,7 +465,7 @@ def fig_trajectories(data_dir='./data', out_dir='.'):
 
     fig.suptitle(
         'Projected trajectories (noiseless ODE, transient faded)\n'
-        'Top: Producer 1 vs Herbivore 3   |   Bottom: Producer 1 vs Herbivore 4',
+        'Top: Producer 1 vs Herbivore 1   |   Bottom: Producer 1 vs Herbivore 2',
         fontsize=12
     )
     plt.tight_layout(rect=[0, 0.05, 1, 1])
@@ -478,11 +485,15 @@ def main():
                         help='Single figure number. Omit for all.')
     parser.add_argument('--data_dir', type=str, default='./data')
     parser.add_argument('--out',      type=str, default='./figures')
+    parser.add_argument('--a_hidden_compare', type=float, default=None,
+                        help='If provided, Fig 2 shows well-specified vs this '
+                             'a_hidden value side-by-side. Default: well-specified only.')
     args = parser.parse_args()
 
     figs = {
         1: lambda: fig_food_web(out_dir=args.out),
-        2: lambda: fig_time_series(data_dir=args.data_dir, out_dir=args.out),
+        2: lambda: fig_time_series(data_dir=args.data_dir, out_dir=args.out,
+                                   a_hidden_compare=args.a_hidden_compare),
         3: lambda: fig_competition_effect(data_dir=args.data_dir, out_dir=args.out),
         4: lambda: fig_trajectories(data_dir=args.data_dir, out_dir=args.out),
     }

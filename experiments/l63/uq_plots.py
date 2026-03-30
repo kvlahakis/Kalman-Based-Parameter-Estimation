@@ -21,19 +21,19 @@ def main() -> None:
     parser.add_argument(
         "--results_dir",
         type=str,
-        default="ADEnKF/experiments/l63_param_est/runs/AD_l63_param_est_torch",
+        default="experiments/l63/runs/AD_l63_param_est",
         help="Directory containing the saved *.npy posterior files (e.g. AD-EnKF run).",
     )
     parser.add_argument(
         "--results_dir_em",
         type=str,
-        default="ADEnKF/experiments/l63_param_est/runs/EM_l63_param_est_torch",
+        default="experiments/l63/runs/EM_l63_param_est",
         help="Optional second directory (e.g. EM-EnKF run) to overlay in the same plots.",
     )
     parser.add_argument(
         "--out_dir",
         type=str,
-        default="ADEnKF/experiments/l63_param_est/uq_results",
+        default="experiments/l63/figures",
         help="Output directory.",
     )
     args = parser.parse_args()

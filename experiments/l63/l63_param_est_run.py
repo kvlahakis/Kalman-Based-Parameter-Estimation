@@ -15,15 +15,9 @@ Override config, e.g.:
   python ADEnKF/experiments/l63_param_est/l63_param_est_run.py data_path=null
 """
 
-from pathlib import Path
 import sys
-
-# Repo root = EnKF_PPE_clone; ensure we can import `paths`, `examples`, and `torchEnKF`
-_script_dir = Path(__file__).resolve().parent          # ADEnKF/experiments/l63_param_est
-_ad_enkf_dir = _script_dir.parent.parent              # ADEnKF
-_repo_root = _ad_enkf_dir.parent                      # repo root
-sys.path.insert(0, str(_repo_root))
-sys.path.insert(0, str(_ad_enkf_dir))
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # repo root
 
 from examples import generate_data
 from torchEnKF import da_methods, nn_templates, noise
@@ -479,5 +473,12 @@ def to_float(x):
 
 if __name__ == "__main__":
     _SCRIPT_DIR = Path(__file__).resolve().parent
-    sys.argv.append(f"hydra.run.dir={_SCRIPT_DIR}/runs/EM_l63_param_est_torch")
+    import sys
+    filter_mode_cli = "ad"
+    for arg in sys.argv[1:]:
+        if arg.startswith("filter_mode="):
+            filter_mode_cli = arg.split("=", 1)[1].strip().lower()
+            break
+    prefix = "AD" if filter_mode_cli == "ad" else "EM"
+    sys.argv.append(f"hydra.run.dir={_SCRIPT_DIR}/runs/{prefix}_l63_param_est")
     run()

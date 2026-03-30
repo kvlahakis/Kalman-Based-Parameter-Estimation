@@ -4,7 +4,7 @@ EM-style EnKF (Term A only) implemented as a standalone method.
 This mirrors the structure of torchEnKF.da_methods.EnKF but
 detaches the ensemble after each analysis step so that gradients
 propagate only through the *current* forecast/analysis step
-with respect to parameters (Expectation–Maximization style),
+with respect to parameters (Expectation-Maximization style),
 not through the full particle history (no Term B).
 
 Intended usage:
@@ -20,6 +20,7 @@ from typing import Dict, Optional, Tuple
 import torch
 from torchdiffeq import odeint
 
+# torchEnKF lives at repo root — no ADEnKF prefix needed.
 from torchEnKF.da_methods import inv_logdet
 
 
@@ -79,40 +80,44 @@ def EnKF_EM(
     logdet_noise_R = noise_R_param.logdet()
 
     t_cur = float(t0)
-    pbar = tqdm(range(n_obs), desc="Running EM-EnKF", leave=False) if tqdm is not None else range(n_obs)
+    pbar = (tqdm(range(n_obs), desc="Running EM-EnKF", leave=False)
+            if tqdm is not None else range(n_obs))
 
     for j in pbar:
         # ----- Forecast step -----
         n_steps = round(((t_obs[j] - t_cur) / step_size).item())
-        t_span = torch.linspace(t_cur, float(t_obs[j].item()), n_steps + 1, device=device)
-        X = odeint(ode_func, X, t_span, method=ode_method, options=dict(step_size=step_size))[-1]
+        t_span = torch.linspace(
+            t_cur, float(t_obs[j].item()), n_steps + 1, device=device
+        )
+        X = odeint(ode_func, X, t_span, method=ode_method,
+                   options=dict(step_size=step_size))[-1]
         t_cur = float(t_obs[j].item())
 
         if model_Q_param is not None:
             X = model_Q_param(X)
 
-        X_m = X.mean(dim=-2).unsqueeze(-2)  # (*bs, 1, x_dim)
-        X_ct = X - X_m                      # (*bs, N_ensem, x_dim)
+        X_m = X.mean(dim=-2).unsqueeze(-2)   # (*bs, 1, x_dim)
+        X_ct = X - X_m                        # (*bs, N_ensem, x_dim)
 
-        # ----- Analysis step (linear obs only, as in current experiments) -----
-        H = obs_func.H  # (y_dim, x_dim)
+        # ----- Analysis step (linear obs) -----
+        H = obs_func.H                         # (y_dim, x_dim)
         HX = X @ H.T
         HX_m = X_m @ H.T
         HX_ct = HX - HX_m
 
-        y_obs_j = y_obs[j].unsqueeze(-2)  # (*bs, 1, y_dim)
+        y_obs_j = y_obs[j].unsqueeze(-2)       # (*bs, 1, y_dim)
         obs_perturb = noise_R_param(y_obs_j.expand(*bs, N_ensem, y_dim))
 
-        C_ww_sq = 1.0 / math.sqrt(N_ensem - 1) * HX_ct  # (*bs, N_ensem, y_dim)
+        C_ww_sq = 1.0 / math.sqrt(N_ensem - 1) * HX_ct   # (*bs, N_ensem, y_dim)
         v1 = obs_perturb - HX
         v2 = y_obs_j - HX_m
-        v = torch.cat((v1, v2), dim=-2)  # (*bs, N_ensem + 1, y_dim)
+        v = torch.cat((v1, v2), dim=-2)                    # (*bs, N_ensem+1, y_dim)
 
         C_ww_R_invv, C_ww_R_logdet = inv_logdet(
             v, C_ww_sq, noise_R_mat, noise_R_inv, logdet_noise_R
-        )  # (*bs, N_ensem+1, y_dim), (*bs)
+        )
 
-        pre = C_ww_R_invv[..., :N_ensem, :]  # (*bs, N_ensem, y_dim)
+        pre = C_ww_R_invv[..., :N_ensem, :]               # (*bs, N_ensem, y_dim)
 
         if compute_likelihood:
             part1 = -0.5 * (y_dim * math.log(2.0 * math.pi) + C_ww_R_logdet)
@@ -126,11 +131,11 @@ def EnKF_EM(
             pre @ C_ww_sq.transpose(-1, -2)
         ) @ X_ct
 
-        # Critical EM step: treat updated ensemble as *data* for the next step.
+        # Critical EM step: detach ensemble so gradients only flow through
+        # the *current* step (Term A), not through history (Term B).
         X = X.detach()
 
     return X, res, log_likelihood
 
 
 __all__ = ["EnKF_EM"]
-
