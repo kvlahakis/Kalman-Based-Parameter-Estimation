@@ -106,9 +106,11 @@ def _save(fig, name, out_dir):
 # Fig 1 — Food web diagram with edge weights
 # ---------------------------------------------------------------------------
 
-def fig_food_web(a_hidden_shown=0.15, out_dir='.'):
+def fig_food_web(a_hidden_shown=None, out_dir='.'):
     """
-    Two-panel food web diagram.
+    Food web diagram.
+    If a_hidden_shown is None: single panel showing the filter model only.
+    If a_hidden_shown is provided: two panels, filter model vs true system.
     Edge thickness proportional to |a_ij|; numeric weight shown as edge label.
     Positive edges (gain) in green, negative (loss/competition) in red.
     Hidden interaction shown dashed.
@@ -128,14 +130,20 @@ def fig_food_web(a_hidden_shown=0.15, out_dir='.'):
         4: ( 0.0,  3.4),   # AP
     }
 
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6.5))
-    titles = [
-        'Filter model (assumed)',
-        f'True system  ($a_{{\\mathrm{{hidden}}}}={a_hidden_shown:.2f}$)'
-    ]
+    if a_hidden_shown is None:
+        fig, axes_arr = plt.subplots(1, 1, figsize=(7, 6.5))
+        axes_arr = [axes_arr]
+        panel_specs = [(axes_arr[0], False, 'Filter model (assumed)')]
+    else:
+        fig, axes_arr = plt.subplots(1, 2, figsize=(14, 6.5))
+        panel_specs = [
+            (axes_arr[0], False, 'Filter model (assumed)'),
+            (axes_arr[1], True,
+             f'True system  ($a_{{\\mathrm{{hidden}}}}={a_hidden_shown:.2f}$)'),
+        ]
 
-    for ax, show_hidden, title in zip(axes, [False, True], titles):
-        A = get_true_A(a_hidden_shown if show_hidden else 0.0)
+    for ax, show_hidden, title in panel_specs:
+        A = get_true_A(a_hidden_shown if (show_hidden and a_hidden_shown is not None) else 0.0)
         G = nx.DiGraph()
         G.add_nodes_from(range(5))
 
@@ -224,8 +232,6 @@ def fig_food_web(a_hidden_shown=0.15, out_dir='.'):
     legend_elements = [
         Line2D([0], [0], color='#1e8449', lw=2.5, label='Positive effect (gain)'),
         Line2D([0], [0], color='#c0392b', lw=2.5, label='Negative effect (loss / competition)'),
-        Line2D([0], [0], color='#888888', lw=2.0, ls='--',
-               label='Hidden interaction (unknown to filter)'),
         Line2D([0], [0], color='black',   lw=1.5,
                label='Edge width $\\propto$ interaction strength $|a_{ij}|$'),
     ]
@@ -243,85 +249,70 @@ def fig_food_web(a_hidden_shown=0.15, out_dir='.'):
 
 def fig_time_series(data_dir='./data', out_dir='.', a_hidden_compare=None):
     """
-    Time series figure.
+    One image per row per column combination.
 
-    If a_hidden_compare is None: single column, well-specified case only.
-    If a_hidden_compare is provided: two columns, well-specified vs misspecified.
-
-    Panel layout depends on observability:
-      - All species observed: 3 rows (Producers / Herbivores / Apex Predator)
-      - Partial obs:          2 rows (Observed / Unobserved)
+    Naming:
+      fig2_ts_[group]_[case].png
+      group: producers | herbivores | apex  (all-obs)
+             observed | unobserved          (partial-obs)
+      case:  wellspec | misspec
     """
-    cases = [0.00] if a_hidden_compare is None else [0.00, a_hidden_compare]
-    n_cols = len(cases)
+    cases = [('wellspec', 0.00)]
+    if a_hidden_compare is not None:
+        cases.append(('misspec', a_hidden_compare))
 
-    # determine observability from first dataset
-    truth0, obs0 = load(cases[0], data_dir)
+    # Determine row structure from first dataset
+    truth0, obs0 = load(cases[0][1], data_dir)
     H0        = obs0['H']
     obs_idx   = np.where(H0.sum(axis=0) > 0)[0]
     unobs_idx = np.where(H0.sum(axis=0) == 0)[0]
     all_obs   = len(unobs_idx) == 0
 
     if all_obs:
-        n_rows     = 3
+        row_groups = [[0, 1], [2, 3], [4]]
+        row_names  = ['producers', 'herbivores', 'apex']
         row_labels = ['Producers', 'Herbivores', 'Apex Predator']
-        row_species = [[0, 1], [2, 3], [4]]
     else:
-        n_rows     = 2
+        row_groups = [list(obs_idx), list(unobs_idx)]
+        row_names  = ['observed', 'unobserved']
         row_labels = ['Observed species', 'Unobserved species']
-        row_species = [list(obs_idx), list(unobs_idx)]
 
-    fig, axes = plt.subplots(n_rows, n_cols,
-                             figsize=(7 * n_cols, 3.5 * n_rows),
-                             sharex=True, sharey='row',
-                             squeeze=False)
+    style_handles = [
+        Line2D([0], [0], color='gray', lw=2,             label='Deterministic trajectory'),
+        Line2D([0], [0], color='gray', lw=0, marker='o', ms=5,
+               label='Noisy observation $y_k$'),
+    ]
 
-    for col, a_h in enumerate(cases):
+    for case_name, a_h in cases:
         truth, obs = load(a_h, data_dir)
-        t = truth['t']
-        X = truth['X']
-        Y = obs['Y']
-        H = obs['H']
+        t = truth['t'];  X = truth['X'];  Y = obs['Y'];  H = obs['H']
         obs_idx_col = np.where(H.sum(axis=0) > 0)[0]
 
-        col_title = ('Well-specified  ($a_{\\mathrm{hidden}}=0$)'
-                     if a_h == 0.0 else
-                     f'Misspecified  ($a_{{\\mathrm{{hidden}}}}={a_h:.2f}$)')
-        axes[0, col].set_title(col_title, fontsize=11)
+        # col_title = ('Well-specified  ($a_{\\mathrm{hidden}}=0$)'
+        #              if a_h == 0.0 else
+        #              f'Misspecified  ($a_{{\\mathrm{{hidden}}}}={a_h:.2f}$)')
 
-        for row, (species_group, row_label) in enumerate(zip(row_species, row_labels)):
-            ax = axes[row, col]
+        for species_group, group_name, row_label in zip(row_groups, row_names, row_labels):
+            fig, ax = plt.subplots(figsize=(8, 4))
             for i in species_group:
-                ax.plot(t, X[i], color=SPECIES_COLORS[i], lw=1.8, alpha=0.85,
-                        label=SPECIES_NAMES[i])
+                ax.plot(t, X[i], color=SPECIES_COLORS[i], lw=1.8, alpha=0.85)
                 if i in obs_idx_col:
                     k = np.where(obs_idx_col == i)[0][0]
                     ax.scatter(t[::2], Y[k, ::2], color=SPECIES_COLORS[i],
                                s=8, alpha=0.6, zorder=3)
-            if col == 0:
-                ax.set_ylabel(row_label, fontsize=10)
-            if row == n_rows - 1:
-                ax.set_xlabel('Time', fontsize=10)
+            ax.set_xlabel('Time', fontsize=10)
+            ax.set_ylabel('Population', fontsize=10)
+            ax.set_title(row_label, fontsize=11)
             ax.set_ylim(bottom=0)
 
-    species_handles = [
-        Line2D([0], [0], color=SPECIES_COLORS[i], lw=2.2, label=SPECIES_NAMES[i])
-        for i in range(5)
-    ]
-    style_handles = [
-        Line2D([0], [0], color='gray', lw=2,             label='True trajectory'),
-        Line2D([0], [0], color='gray', lw=0, marker='o', ms=5,
-               label='Noisy observation $y_k$'),
-    ]
-    fig.legend(handles=species_handles + style_handles,
-               loc='lower center', ncol=4,
-               fontsize=9, bbox_to_anchor=(0.5, -0.05))
+            species_handles = [
+                Line2D([0], [0], color=SPECIES_COLORS[i], lw=2.2, label=SPECIES_NAMES[i])
+                for i in species_group
+            ]
+            ax.legend(handles=species_handles + style_handles, fontsize=8)
 
-    fig.suptitle('Population dynamics: true trajectories and noisy observations',
-                 fontsize=13)
-    plt.tight_layout(rect=[0, 0.07, 1, 1])
-    _save(fig, 'fig2_time_series', out_dir)
-
+            plt.tight_layout()
+            _save(fig, f'fig2_ts_{group_name}_{case_name}', out_dir)
 
 
 # ---------------------------------------------------------------------------
@@ -485,13 +476,16 @@ def main():
                         help='Single figure number. Omit for all.')
     parser.add_argument('--data_dir', type=str, default='./data')
     parser.add_argument('--out',      type=str, default='./figures')
+    parser.add_argument('--a_hidden_shown', type=float, default=None,
+                        help='If provided, Fig 1 shows filter model vs true system '
+                             'at this a_hidden value. Default: filter model only.')
     parser.add_argument('--a_hidden_compare', type=float, default=None,
                         help='If provided, Fig 2 shows well-specified vs this '
                              'a_hidden value side-by-side. Default: well-specified only.')
     args = parser.parse_args()
 
     figs = {
-        1: lambda: fig_food_web(out_dir=args.out),
+        1: lambda: fig_food_web(a_hidden_shown=args.a_hidden_shown, out_dir=args.out),
         2: lambda: fig_time_series(data_dir=args.data_dir, out_dir=args.out,
                                    a_hidden_compare=args.a_hidden_compare),
         3: lambda: fig_competition_effect(data_dir=args.data_dir, out_dir=args.out),

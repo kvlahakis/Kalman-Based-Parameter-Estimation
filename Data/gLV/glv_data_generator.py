@@ -55,11 +55,11 @@ from scipy.integrate import solve_ivp
 # Producers are self-sustaining (r > 0); consumers starve without prey (r < 0).
 # Herb3's r is only slightly negative so it remains viable even when Producer 1
 # is partially depleted by the hidden interaction at higher a_hidden values.
-R_TRUE = np.array([1.2, 1.0, -0.05, -0.3, -0.1])
+# R_TRUE = np.array([1.2, 1.0, -0.05, -0.3, -0.1])
 
 # Conversion efficiency: fraction of consumed biomass converted to predator growth.
 # Encodes the ecological rule that energy is lost at each trophic transfer.
-EPS = 0.75
+EPS = 0.5
 
 # Base interaction matrix — the filter ALWAYS assumes this sparsity pattern.
 # Convention: A[i, j] = effect of species j on species i's per-capita growth rate.
@@ -67,19 +67,36 @@ EPS = 0.75
 #   A[i, j] < 0  : species j harms species i     (predation loss, competition, self-reg)
 # Predation pairs satisfy: A[predator, prey] = +alpha*EPS, A[prey, predator] = -alpha
 # fmt: off
+
+
+# A_TRUE = np.array([
+#     [-0.50,    0.0,   -0.25,   0.0,     0.0 ],  # prod1:    self-reg; loss to herb3
+#     [  0.0,   -0.40,   0.0,   -0.40,    0.0 ],  # prod2:    self-reg; loss to herb4
+#     [  0.215,  0.0,   -0.10,   0.0,    -0.25 ],  # herb3:    gain from prod1; loss to predator
+#     [  0.0,    0.2625, 0.0,   -0.15,   -0.25 ],  # herb4:    gain from prod2; loss to predator
+#     [  0.0,    0.0,    0.215,  0.215,  -0.1 ],  # predator: gain from herb3 and herb4
+# ])
+
+
+R_TRUE = np.array([1.3, 1.1, -0.05, -0.3, -0.2])
+
 A_TRUE = np.array([
-    [-0.50,    0.0,   -0.25,   0.0,     0.0 ],  # prod1:    self-reg; loss to herb3
-    [  0.0,   -0.40,   0.0,   -0.40,    0.0 ],  # prod2:    self-reg; loss to herb4
-    [  0.215,  0.0,   -0.10,   0.0,    -0.25 ],  # herb3:    gain from prod1; loss to predator
-    [  0.0,    0.2625, 0.0,   -0.15,   -0.25 ],  # herb4:    gain from prod2; loss to predator
-    [  0.0,    0.0,    0.215,  0.215,  -0.1 ],  # predator: gain from herb3 and herb4
+    [-0.01,  0.0,   -0.80,  0.0,    0.0 ],  # Prod1: Near-zero self-regulation (unstable)
+    [ 0.0,  0.0,   0.0,   -0.70,   0.0 ],  # Prod2: High self-regulation (stable)
+    [ 0.60,  0.0,   0.0,  0.0,   -0.25 ], 
+    [ 0.0,   0.45,   0.0,   0.0,  -0.2 ], 
+    [ 0.0,   0.0,    0.15,   0.1,  -0.1 ], 
 ])
+
+
+
+
 # fmt: on
 
 # Sweep values for the hidden interaction strength.
 # a_hidden = 0.0 is the well-specified baseline.
 # Upper limit of 0.20 keeps all five species viable across the full sweep.
-A_HIDDEN_SWEEP = [0.0, 0.05, 0.10, 0.15, 0.20]
+A_HIDDEN_SWEEP = [0.0, 0.10, 0.20, 0.30, 0.40]
 
 # Observation settings
 OBS_NOISE_STD    = 0.05

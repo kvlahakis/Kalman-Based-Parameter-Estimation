@@ -79,7 +79,7 @@ model_Q = noise.AddGaussian(x_dim,
                              "diag").to(device)
 
 
-def load_observations(n_obs: int = 150, n_forecasts: int = 5, dt: float = 0.01):
+def load_observations(n_obs: int = 80, n_forecasts: int = 5, dt: float = 0.01):
     data_file = DATA_DIR / "Lorentz63/sigma10.0000_rho28.0000_beta2.6667_dt0.0100.pt"
     payload   = torch.load(data_file, weights_only=True)
     truth     = payload["data"]
@@ -157,7 +157,7 @@ def compute_gradient(coeff, y_obs, t_obs, mode, n_ens=None):
 # Panel 1 — Gradient landscape
 # ═══════════════════════════════════════════════════════════════════════════
 
-def panel1_gradient_landscape(ax, n_obs=150):
+def panel1_gradient_landscape(ax, n_obs=80):
     print("Panel 1: gradient landscape...")
     y_obs, t_obs, _ = load_observations(n_obs=n_obs)
 
@@ -194,7 +194,7 @@ def panel1_gradient_landscape(ax, n_obs=150):
 # lr=0.2, n_steps=60: both methods reach their fixed points within the window.
 # ═══════════════════════════════════════════════════════════════════════════
 
-def panel2_optimisation(ax, n_obs=150, n_steps=30, lr=0.2, n_ens=50):
+def panel2_optimisation(ax, n_obs=80, n_steps=30, lr=0.2, n_ens=50):
     print("Panel 2: optimization trajectories...")
     y_obs, t_obs, _ = load_observations(n_obs=n_obs)
 
